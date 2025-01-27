@@ -1,74 +1,198 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
+} from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
+import { fetchPostDetails, fetchPosts, fetchUserDetails } from "@/utils/api";
+import PostDetail, { Post, User } from "@/components/PostDetails";
+import { Stack } from "expo-router";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 
-export default function HomeScreen() {
+// BottomSheet Bileşeni
+function BottomSheet({
+  isOpen,
+  toggleSheet,
+  duration = 500,
+  children,
+}: {
+  isOpen: Animated.SharedValue<boolean>;
+  toggleSheet: () => void;
+  duration?: number;
+  children: React.ReactNode;
+}) {
+  const height = useSharedValue(0);
+  const progress = useDerivedValue(() =>
+    withTiming(isOpen.value ? 0 : 1, { duration })
+  );
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: progress.value * 2 * height.value }],
+  }));
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: 1 - progress.value,
+    zIndex: isOpen.value ? 1 : withDelay(duration, withTiming(-1, { duration: 0 })),
+  }));
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <>
+      <Animated.View style={[sheetStyles.backdrop, backdropStyle]}>
+        <TouchableOpacity style={styles.flex} onPress={toggleSheet} />
+      </Animated.View>
+      <Animated.View
+        onLayout={(e) => {
+          height.value = e.nativeEvent.layout.height;
+        }}
+        style={[sheetStyles.sheet, sheetStyle]}
+      >
+        {children}
+      </Animated.View>
+    </>
   );
 }
 
+const App: React.FC = () => {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [userDetails, setUserDetails] = useState<User | undefined>(undefined);
+  const isOpen = useSharedValue(false);
+
+  const toggleSheet = () => {
+    isOpen.value = !isOpen.value;
+  };
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      const data = await fetchPosts();
+      setPosts(data);
+    };
+    loadPosts();
+  }, []);
+
+  const handlePostPress = async (postId: number) => {
+    const post = await fetchPostDetails(postId);
+    const user = await fetchUserDetails(post.userId);
+    setSelectedPost(post);
+    setUserDetails(user);
+    toggleSheet();
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Text style={styles.title}>Post List</Text>
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.postItem}
+            onPress={() => handlePostPress(item.id)}
+          >
+            <Text style={styles.postTitle}>{item.title}</Text>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.listContainer}
+      />
+      <BottomSheet isOpen={isOpen} toggleSheet={toggleSheet}>
+        {selectedPost && (
+          <View style={styles.sheetContent}>
+           <PostDetail post={selectedPost} user={userDetails}/>
+          </View>
+        )}
+      </BottomSheet>
+    </SafeAreaView>
+  );
+};
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#f8f8f8",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginVertical: 20,
+    color: "#2D625F",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  listContainer: {
+    padding: 16,
+  },
+  postItem: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  postTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2D625F",
+  },
+  sheetContent: {
+    padding: 20,
+    alignItems: "center",
+  },
+  postDetailTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  postDetailBody: {
+    fontSize: 16,
+    textAlign: "center",
+    color: "#555",
+  },
+  closeButton: {
+    alignSelf: "flex-end",
+    marginBottom: 10,
+  },
+  flex: {
+    flex: 1,
   },
 });
+
+const sheetStyles = StyleSheet.create({
+  sheet: {
+    padding: 16,
+    width: "100%",
+    position: "absolute",
+    bottom: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    zIndex: 2,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+});
+
+export default App;

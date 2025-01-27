@@ -1,3 +1,15 @@
+# Developer notes
+- Test apisi için giriş bilgileri:
+Email: user@test.com 
+Password: 123456
+
+- Login sayfası için firebase kullanıldı
+- Typescript standartlarına uygun olarak kodlandı
+- Detay sayfası için UX geliştirecek yönde BottomSheet kullanıldı
+- Endpointler seperate edildi ve okunaklı kodlandı
+- Klasör yapısı clean code standartlarına uygun geliştirildi
+- **UI geliştirilebilir, özelleştirilebilir, animasyonlar eklenebilir.
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
